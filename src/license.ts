@@ -10,6 +10,7 @@ function tokenFromUrl(): string {
   const token = url.searchParams.get('license')?.trim() ?? '';
   if (token) {
     localStorage.setItem(TOKEN_KEY, token);
+    localStorage.removeItem(CACHE_KEY);
     url.searchParams.delete('license');
     history.replaceState({}, '', `${url.pathname}${url.search}${url.hash}`);
   }

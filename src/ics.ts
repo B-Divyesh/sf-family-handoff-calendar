@@ -79,6 +79,47 @@ function memberByName(members: Member[], value = ''): string {
   return members.find(member => member.name.toLocaleLowerCase() === clean)?.id ?? '';
 }
 
+const weekdayCodes = ['SU', 'MO', 'TU', 'WE', 'TH', 'FR', 'SA'];
+
+function recurrenceStart(base: CalendarEvent, startProperty: IcsProperty, dayOffset: number): Date {
+  const raw = startProperty.value.trim();
+  if (/^\d{8}T\d{6}$/.test(raw) && startProperty.params.TZID) {
+    const anchor = new Date(Date.UTC(Number(raw.slice(0, 4)), Number(raw.slice(4, 6)) - 1, Number(raw.slice(6, 8)) + dayOffset));
+    const local = `${anchor.getUTCFullYear()}${String(anchor.getUTCMonth() + 1).padStart(2, '0')}${String(anchor.getUTCDate()).padStart(2, '0')}T${raw.slice(9)}`;
+    return zonedDateToUtc(local, startProperty.params.TZID);
+  }
+  if (/^\d{8}$/.test(raw) || startProperty.params.VALUE === 'DATE') {
+    const date = new Date(base.start); date.setDate(date.getDate() + dayOffset); return date;
+  }
+  const date = new Date(base.start); date.setUTCDate(date.getUTCDate() + dayOffset); return date;
+}
+
+function expandRecurrence(base: CalendarEvent, rule: string, startProperty: IcsProperty): CalendarEvent[] {
+  const values = Object.fromEntries(rule.split(';').map(item => item.split('=', 2).map(part => part.toUpperCase()))) as Record<string, string>;
+  if (!['DAILY', 'WEEKLY'].includes(values.FREQ)) throw new Error(`recurrence ${values.FREQ || 'rule'} is not supported`);
+  const interval = Math.max(1, Number(values.INTERVAL) || 1);
+  const count = values.COUNT ? Math.max(1, Number(values.COUNT) || 1) : Number.POSITIVE_INFINITY;
+  const until = values.UNTIL ? parseIcsDate({ value: values.UNTIL, params: startProperty.params }).date : new Date(Date.now() + 366 * 86400000);
+  const keepAfter = new Date(Date.now() - 90 * 86400000);
+  const byDays = values.BYDAY?.split(',').map(value => value.slice(-2)) ?? [];
+  const duration = new Date(base.end).getTime() - new Date(base.start).getTime();
+  const occurrences: CalendarEvent[] = [];
+  let matched = 0;
+  for (let offset = 0; offset <= 20000 && matched < count && occurrences.length < 800; offset += 1) {
+    const start = recurrenceStart(base, startProperty, offset);
+    if (start > until) break;
+    const weekday = weekdayCodes[/^\d{8}/.test(startProperty.value) ? new Date(Date.UTC(start.getFullYear(), start.getMonth(), start.getDate())).getUTCDay() : start.getUTCDay()];
+    const eligible = values.FREQ === 'DAILY'
+      ? offset % interval === 0
+      : Math.floor(offset / 7) % interval === 0 && (byDays.length ? byDays.includes(weekday) : offset % 7 === 0);
+    if (!eligible) continue;
+    matched += 1;
+    if (start < keepAfter && new Date(base.start) < keepAfter) continue;
+    occurrences.push({ ...base, id: offset ? `${base.id}-${start.toISOString().slice(0, 10)}` : base.id, start: start.toISOString(), end: new Date(start.getTime() + duration).toISOString() });
+  }
+  return occurrences;
+}
+
 export function importIcs(input: string, members: Member[]): { events: CalendarEvent[]; warnings: string[] } {
   if (!input.includes('BEGIN:VCALENDAR')) throw new Error('This does not look like an ICS calendar file.');
   const lines = unfold(input);
@@ -96,7 +137,7 @@ export function importIcs(input: string, members: Member[]): { events: CalendarE
         const parsedEnd = endProp ? parseIcsDate(endProp) : { date: new Date(parsedStart.date.getTime() + (parsedStart.allDay ? 86400000 : 3600000)), allDay: parsedStart.allDay };
         const title = unescapeIcs(current.get('SUMMARY')?.value || 'Untitled event').trim();
         const uid = unescapeIcs(current.get('UID')?.value || crypto.randomUUID());
-        events.push({
+        const baseEvent: CalendarEvent = {
           id: `ics-${uid}`,
           title,
           start: parsedStart.date.toISOString(), end: parsedEnd.date.toISOString(), allDay: parsedStart.allDay,
@@ -106,7 +147,15 @@ export function importIcs(input: string, members: Member[]): { events: CalendarE
           toId: memberByName(members, current.get('X-FAMILY-HANDOFF-TO')?.value),
           location: unescapeIcs(current.get('LOCATION')?.value || ''),
           notes: unescapeIcs(current.get('DESCRIPTION')?.value || ''), source: 'ics', updatedAt: new Date().toISOString()
-        });
+        };
+        const recurrence = current.get('RRULE')?.value;
+        if (recurrence) {
+          try { events.push(...expandRecurrence(baseEvent, recurrence, startProp)); }
+          catch (error) {
+            events.push(baseEvent);
+            warnings.push(`${title}: ${error instanceof Error ? error.message : 'recurrence could not be expanded'}; imported its first occurrence.`);
+          }
+        } else events.push(baseEvent);
       } catch (error) {
         warnings.push(error instanceof Error ? error.message : 'One event could not be read.');
       }
@@ -128,8 +177,10 @@ export function exportIcs(data: AppData): string {
   const memberName = (id: string) => data.members.find(member => member.id === id)?.name ?? '';
   const lines = ['BEGIN:VCALENDAR', 'VERSION:2.0', 'PRODID:-//Family Handoff Calendar//EN', 'CALSCALE:GREGORIAN', `X-WR-CALNAME:${escapeIcs(data.householdName)}`];
   for (const event of data.events) {
+    const localDate = (iso: string) => { const value = new Date(iso); return `${value.getFullYear()}${String(value.getMonth() + 1).padStart(2, '0')}${String(value.getDate()).padStart(2, '0')}`; };
     lines.push('BEGIN:VEVENT', `UID:${escapeIcs(event.id)}@family-handoff-calendar.local`, `DTSTAMP:${utcIcs(event.updatedAt)}`,
-      `DTSTART:${utcIcs(event.start)}`, `DTEND:${utcIcs(event.end)}`, `SUMMARY:${escapeIcs(event.title)}`,
+      event.allDay ? `DTSTART;VALUE=DATE:${localDate(event.start)}` : `DTSTART:${utcIcs(event.start)}`,
+      event.allDay ? `DTEND;VALUE=DATE:${localDate(event.end)}` : `DTEND:${utcIcs(event.end)}`, `SUMMARY:${escapeIcs(event.title)}`,
       `CATEGORIES:${event.kind.toUpperCase()}`, `X-FAMILY-HANDOFF-TYPE:${event.kind}`);
     if (event.location) lines.push(`LOCATION:${escapeIcs(event.location)}`);
     if (event.notes) lines.push(`DESCRIPTION:${escapeIcs(event.notes)}`);

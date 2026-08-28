@@ -63,7 +63,7 @@ function boardView(): string {
       <div><p class="eyebrow">Your local dispatch board</p><h2 id="first-run-title">Start with the people who trade the keys.</h2>
       <p>Add household members, then record a pickup or import the calendar you already use. Nothing leaves this device.</p>
       <div class="button-row"><button class="primary-button" data-action="add-member">Add first member</button><button class="secondary-button" data-action="import">Import an ICS file</button></div></div>
-      <img src="/assets/handoff-market-hero.webp" width="768" height="512" alt="School satchel, blank week sheet, key sets and handoff tickets on a rain-dark night-market counter" decoding="async" fetchpriority="high" />
+      <img src="/assets/handoff-market-hero.webp" srcset="/assets/handoff-market-hero-640.webp 640w, /assets/handoff-market-hero.webp 1024w" sizes="(max-width: 850px) calc(100vw - 24px), 590px" width="768" height="512" alt="School satchel, blank week sheet, key sets and handoff tickets on a rain-dark night-market counter" decoding="async" fetchpriority="high" />
     </section>`;
   }
   if (!upcoming.length) {

@@ -33,6 +33,11 @@ test('has no serious or critical accessibility violations', async ({ page }) => 
     return engine.run(document);
   });
   expect(results.violations.filter(item => ['serious', 'critical'].includes(item.impact ?? ''))).toEqual([]);
+  await page.getByRole('button', { name: 'Add handoff' }).focus();
+  await page.keyboard.press('Enter');
+  await expect(page.getByRole('dialog')).toBeVisible();
+  await page.keyboard.press('Escape');
+  await expect(page.getByRole('dialog')).toHaveCount(0);
 });
 
 test('loads the saved shell offline', async ({ page, context }) => {

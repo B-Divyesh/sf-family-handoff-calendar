@@ -43,4 +43,20 @@ describe('ICS portability', () => {
     expect(result.events).toHaveLength(1);
     expect(result.warnings).toEqual(['event has no start time']);
   });
+
+  it('expands common weekly recurrence rules into editable stops', () => {
+    const future = new Date(); future.setDate(future.getDate() + 1);
+    const stamp = `${future.getUTCFullYear()}${String(future.getUTCMonth() + 1).padStart(2, '0')}${String(future.getUTCDate()).padStart(2, '0')}T090000Z`;
+    const source = `BEGIN:VCALENDAR\nBEGIN:VEVENT\nUID:practice\nDTSTART:${stamp}\nDTEND:${stamp.replace('090000', '100000')}\nRRULE:FREQ=WEEKLY;COUNT=3\nSUMMARY:Practice pickup\nEND:VEVENT\nEND:VCALENDAR`;
+    const result = importIcs(source, []);
+    expect(result.events).toHaveLength(3);
+    expect(new Date(result.events[1].start).getTime() - new Date(result.events[0].start).getTime()).toBe(7 * 86400000);
+  });
+
+  it('keeps the first occurrence when a recurrence pattern is unsupported', () => {
+    const source = 'BEGIN:VCALENDAR\nBEGIN:VEVENT\nUID:monthly\nDTSTART:20300828T120000Z\nRRULE:FREQ=MONTHLY\nSUMMARY:Monthly plan\nEND:VEVENT\nEND:VCALENDAR';
+    const result = importIcs(source, []);
+    expect(result.events).toHaveLength(1);
+    expect(result.warnings[0]).toContain('imported its first occurrence');
+  });
 });

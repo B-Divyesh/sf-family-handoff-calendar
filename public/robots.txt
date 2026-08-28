@@ -1,0 +1,4 @@
+User-agent: *
+Allow: /
+
+Sitemap: https://family-handoff-calendar.sociobot.in/sitemap.xml
