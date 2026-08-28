@@ -29,6 +29,7 @@
 | `npm audit --omit=dev` | PASS — 0 vulnerabilities. |
 | Live `verify-url.sh` | PASS — HTTP 200, title, lang, one h1, main, alt coverage, labeled buttons, zero console errors. |
 | Live browser smoke | PASS — 0 console/page errors; 0 axe serious/critical; keyboard Enter/Escape dialog path; 390px `scrollWidth=clientWidth=390`; reduced motion `1e-06s`; controlled-worker offline reload passes. |
+| Service-worker update | PASS — temporary `fhc-v3-test` worker entered waiting, showed “A fresh version is ready”, activated through Update now, and its new shell reloaded offline. |
 | Live privacy/network | PASS — normal use requests only the first-party host; no analytics, third-party assets, cookies, or license request without a token. |
 
 The Lighthouse CLI could not connect to the preinstalled Playwright Chromium (`Unable to connect to Chrome`), so no fresh score is claimed. Playwright/axe and all product-specific browser checks passed.
