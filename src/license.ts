@@ -1,5 +1,7 @@
 export const PRODUCT_SLUG = 'family-handoff-calendar';
-export const BILLING_BASE = import.meta.env.VITE_BILLING_BASE || 'https://pilot-api.sociobot.in';
+// Production builds must target the live billing service. A staging build can
+// still opt into the pilot endpoint explicitly through VITE_BILLING_BASE.
+export const BILLING_BASE = import.meta.env.VITE_BILLING_BASE || 'https://api.sociobot.in';
 const TOKEN_KEY = `sb_license:${PRODUCT_SLUG}`;
 const CACHE_KEY = `${TOKEN_KEY}:verdict`;
 
