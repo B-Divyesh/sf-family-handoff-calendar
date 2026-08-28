@@ -1,0 +1,11 @@
+{
+  "slug": "family-handoff-calendar",
+  "title": "Family Handoff Calendar",
+  "territory": "utilities",
+  "user": "Two-parent households juggling school, work, pickups, and activities who need to see who is responsible at each handoff without committing their family schedule to Google or Apple.",
+  "smallest_useful_product": "Offline PWA importing/exporting ICS, with named household members, handoff/pickup tags, a next-48-hours responsibility board, and a printable week sheet.",
+  "success_measure": "In a four-week pilot, households record 80% of scheduled handoffs and report zero missed handoffs caused by unclear ownership.",
+  "artifact_class": "pwa-offline",
+  "monetization": "one-time",
+  "constraints": "Calendar data remains local; careful timezone/ICS handling; do not collect children's data or offer tracking; shared-device export must be explicit."
+}
