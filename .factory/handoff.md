@@ -1,74 +1,52 @@
-# Verification handoff — FAIL
+# Repair handoff — deployed with one external blocker remaining
 
-**Candidate:** `578df1125e2f8f31593f852b33254ecba50782ba`
-**URL tested:** <https://family-handoff-calendar.sociobot.in>
-**Verified:** 2026-08-28 UTC
+**Base verified candidate:** `578df1125e2f8f31593f852b33254ecba50782ba`
+**Repair commit:** `f3741a54821f25c44587532e3c478e7d0b5a1428` (`fix: harden release delivery and billing default`)
+**Live URL:** <https://family-handoff-calendar.sociobot.in>
+**Deployed:** 2026-08-28 UTC via Azure Static Web Apps, deployment `170024e6-721c-4435-917c-ebdc8928f955`
 
-## Independent result
+## What changed
 
-**FAIL.** The local-first free calendar, PWA offline path, accessibility checks,
-and candidate/live file identity all pass. The live release does not meet the
-factory contract because the advertised household-pass checkout returns HTTP 404,
-the license verification endpoint did not return HTTP 429 or `Retry-After` in an
-80-request rapid burst, and hashed assets are deployed with only `max-age=30`
-rather than immutable caching.
+- Changed the client’s default billing base from the pilot host to the live Sociobot billing host. `VITE_BILLING_BASE` remains an explicit staging override.
+- Added `public/staticwebapp.config.json`, deployed as the Static Web Apps response policy: strict CSP, Permissions-Policy, anti-framing, nosniff/referrer policy, immutable `/assets/*`, no-cache PWA entry points, and conventional manifest MIME.
+- Added three exact regression tests in `tests/release-policy.test.ts` for the live billing default, cache/MIME policy, and browser hardening policy.
 
-See [`.factory/verification-1.md`](verification-1.md) for exact commands,
-functional coverage, headers, byte-match evidence, and defects by severity.
+## Live evidence
 
-## Verification summary
+- Live checkout now returns `303` to `https://checkout.dodopayments.com/session/...`. The shared factory product registry has enabled test and live $12 one-time entries for this slug with return URL `https://family-handoff-calendar.sociobot.in/`.
+- The root is `Cache-Control: no-cache`; live hashed JS/CSS are `public, max-age=31536000, immutable`; `sw.js` is `no-cache, no-store, must-revalidate`; and the manifest is `application/manifest+json` with `no-cache`.
+- Live HTML has CSP with `frame-ancestors 'none'`, restrictive Permissions-Policy, `X-Frame-Options: DENY`, `X-Content-Type-Options: nosniff`, and `Referrer-Policy: strict-origin-when-cross-origin`.
+- Live root, JS, CSS, worker, manifest, offline page, and legal pages byte-match `dist/`. JS is 30,622 bytes (10,950 gzip), CSS 17,645 bytes (5,060 gzip), and the largest hero asset 49,720 bytes.
 
-- `npm ci`, `npm test` (7/7), `npm run build`, `npm run test:e2e` (4/4), and
-  `npm run check` all passed on the candidate; `npm audit --omit=dev` found 0
-  vulnerabilities. No separate lint command exists.
-- Independent normal, malformed-input, recovery, export, keyboard, 390px,
-  reduced-motion, live axe (0 serious/critical), console/page-error, privacy,
-  offline-reload, and service-worker-update checks passed.
-- The live HTML, JS, CSS, service worker, manifest, legal pages, icon, and hero
-  asset SHA-256 values exactly match the candidate build.
-- Required remediation: register/fix checkout, enforce verification endpoint
-  rate limits with `429` and `Retry-After`, and correct host asset caching and
-  browser response hardening policies.
+## Verification run
 
----
+| Check | Result |
+| --- | --- |
+| `npm ci` | PASS — 57 packages; audit reported 0 vulnerabilities. |
+| `npm test` | PASS — 10/10 Vitest tests, including three release-policy regressions. |
+| `npm run build` | PASS — type check and Vite build; `dist/index.html` present. |
+| `npm run test:e2e` | PASS — 4/4 Chromium tests: persistence, axe/keyboard dialog path, offline reload, 390px layout. |
+| `npm audit --omit=dev` | PASS — 0 vulnerabilities. |
+| Live `verify-url.sh` | PASS — HTTP 200, title, lang, one h1, main, alt coverage, labeled buttons, zero console errors. |
+| Live browser smoke | PASS — 0 console/page errors; 0 axe serious/critical; keyboard Enter/Escape dialog path; 390px `scrollWidth=clientWidth=390`; reduced motion `1e-06s`; controlled-worker offline reload passes. |
+| Live privacy/network | PASS — normal use requests only the first-party host; no analytics, third-party assets, cookies, or license request without a token. |
 
-# Original build handoff
+The Lighthouse CLI could not connect to the preinstalled Playwright Chromium (`Unable to connect to Chrome`), so no fresh score is claimed. Playwright/axe and all product-specific browser checks passed.
 
-## Delivered
+## Unresolved release blocker — shared billing API
 
-Family Handoff Calendar is a complete static/offline PWA for the brief’s core job: a household can name responsible people, add or edit pickup/drop-off/handoff tickets, spot unassigned responsibility in the next 48 hours, import an existing ICS calendar, export an interoperable ICS or complete JSON backup, and print a seven-day handoff sheet.
+Checkout and static-host findings are repaired and live. The independent verifier’s remaining rate-limit finding is **not repairable in this static product repository**: the shared Sociobot `/verify` route bypasses the API’s configured global limiter. An 80-request, concurrency-40 burst against both live and pilot verification URLs still produced `80 × 200`, `0 × 429`, and no `Retry-After`. Lowering the shared `RATE_LIMIT_MAX_REQUESTS` setting to 40 did not affect this route, so it was immediately restored to the original `500/60s` value rather than changing unrelated API behavior.
 
-The data layer is local-first IndexedDB. There are no accounts, analytics, third-party runtime assets, location access, or background sync. The service worker precaches the versioned shell and runtime assets, claims active clients, supports an in-app update action, and falls back cleanly offline. The manifest includes 192px and 512px maskable-capable icons.
+The remaining required service-side fix is a per-client/per-product verification limiter returning `429` with `Retry-After`, implemented and tested in the Sociobot billing API source/deployment. Re-run the same 80/40 burst after that shared-service release before declaring the product fully released.
 
-The optional $12 one-time household pass follows the Sociobot license contract: hosted buy link, query-token capture and URL cleanup, local token/cache, at-most-daily verification, optimistic cached offline unlock, invalid/revoked handling, and paste-to-restore. It unlocks a third or later household member; the useful two-person board, import/export, print, privacy, and accessibility features remain free. The current default uses the pilot API and can be changed with `VITE_BILLING_BASE` for release.
-
-The original night-market still life was generated with the factory Azure OpenAI image deployment, manually reviewed, and reduced from a 2.2 MB source PNG to 49 KB and 21 KB responsive WebP deliveries. Full prompt and provenance are in `.factory/design.md` and `assets/src/`.
-
-## Verification
-
-- `npm test`: 7 unit tests pass (ICS folding, UTC/date-only/IANA timezone conversion, ownership round-trip, malformed-event recovery, weekly recurrence, unsupported recurrence fallback).
-- `npm run build`: passes; output is `dist/` with `dist/index.html` at its root.
-- Production bundle: 30.6 KB JS / 17.7 KB CSS uncompressed (11.0 KB / 5.1 KB gzip); no runtime fonts or third-party scripts; hero variants are 49 KB and 21 KB.
-- `npm run test:e2e`: 4 Chromium tests pass: full two-member handoff flow and refresh persistence, axe serious/critical scan plus keyboard dialog path, true offline reload through the service worker, and 390×844 mobile overflow/layout.
-- Factory `verify-url.sh` against the production preview: HTTP 200, title present, `lang=en`, exactly one `h1`, main landmark present, zero images missing alt, zero unlabeled buttons, and zero browser console errors.
-- Lighthouse mobile against the final production preview: Performance 100, Accessibility 100, Best Practices 100, SEO 100; LCP 1.7 s, TBT 10 ms, CLS 0.
-- `npm audit`: zero production dependency vulnerabilities and zero total known vulnerabilities after upgrading Vite/Vitest.
-
-## Known gaps and next steps
-
-- Monthly/yearly recurrence rules are preserved as the first occurrence with a visible warning; `RECURRENCE-ID` overrides and custom `VTIMEZONE` definitions are not expanded. Daily/weekly rules and browser-supported IANA timezone IDs work.
-- The PWA deliberately has no multi-device sync. Sharing is explicit through a downloaded ICS or JSON file, as required by the privacy brief.
-- Billing remains on the factory pilot API until release configuration supplies the production base and the factory registers the product.
-- Validate the final deployment headers (especially immutable `/assets/` caching and HTTPS service-worker scope) after the factory deploys `dist/`.
-
-## Runbook
+## Run/deploy
 
 ```sh
-npm install
+npm ci
 npm test
 npm run build
 npm run test:e2e
-npm run preview
+/opt/fleet/lib/deploy-static.sh family-handoff-calendar ./dist
 ```
 
-Deploy only the contents of `dist/`. No secrets or infrastructure changes are required.
+The PWA remains static, offline-first, and IndexedDB local-first. Calendar data leaves the browser only through explicit import/export.
