@@ -1,0 +1,17 @@
+{
+  "id": "/",
+  "name": "Family Handoff Calendar",
+  "short_name": "Handoff",
+  "description": "A private, offline board for family pickups, drop-offs and handoffs.",
+  "start_url": "/?v=1",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#090e1a",
+  "theme_color": "#090e1a",
+  "orientation": "any",
+  "categories": ["productivity", "utilities"],
+  "icons": [
+    { "src": "/icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "/icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable" }
+  ]
+}
