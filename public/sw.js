@@ -1,4 +1,4 @@
-const VERSION = 'fhc-v2';
+const VERSION = 'fhc-v3';
 const SHELL = `${VERSION}-shell`;
 const ASSETS = `${VERSION}-assets`;
 const PRECACHE = ['/', '/index.html', '/offline.html', '/manifest.webmanifest', '/assets/handoff-market-hero.webp', '/assets/handoff-market-hero-640.webp', '/icons/icon-192.png', '/icons/icon-512.png', '/privacy/', '/terms/'];

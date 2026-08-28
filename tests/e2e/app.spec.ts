@@ -56,3 +56,28 @@ test('works at a 390px mobile viewport', async ({ page }) => {
   await expect(page.getByRole('button', { name: 'Add handoff' })).toBeVisible();
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= 390)).toBe(true);
 });
+
+test('persistent mobile links have 44px touch targets', async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto('/');
+
+  const expectTouchTarget = async (selector: string) => {
+    const targets = page.locator(selector);
+    const count = await targets.count();
+    expect(count).toBeGreaterThan(0);
+    for (let index = 0; index < count; index += 1) {
+      const box = await targets.nth(index).boundingBox();
+      expect(box, `${selector} target ${index + 1} has no rendered box`).not.toBeNull();
+      expect(box!.width, `${selector} target ${index + 1} is too narrow`).toBeGreaterThanOrEqual(44);
+      expect(box!.height, `${selector} target ${index + 1} is too short`).toBeGreaterThanOrEqual(44);
+    }
+  };
+
+  await expectTouchTarget('.brand');
+  await page.locator('.skip-link').focus();
+  await expectTouchTarget('.skip-link');
+  await page.getByRole('button', { name: 'Household' }).click();
+  await expectTouchTarget('.legal-links a');
+  await expectTouchTarget('.site-footer a');
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= 390)).toBe(true);
+});

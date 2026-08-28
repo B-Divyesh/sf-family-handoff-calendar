@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import readme from '../README.md?raw';
 import { BILLING_BASE, buyUrl } from '../src/license';
 import config from '../public/staticwebapp.config.json';
 
@@ -15,6 +16,11 @@ describe('release policy regressions', () => {
   it('uses the live Sociobot checkout endpoint by default', () => {
     expect(BILLING_BASE).toBe('https://api.sociobot.in');
     expect(buyUrl()).toBe('https://api.sociobot.in/api/v1/products/family-handoff-calendar/checkout');
+  });
+
+  it('documents the live default and staging override accurately', () => {
+    expect(readme).toContain('the default is `https://api.sociobot.in`');
+    expect(readme).toContain('Set `VITE_BILLING_BASE` at build time to select another registered environment');
   });
 
   it('ships immutable hashed-asset caching and revalidates PWA entry points', () => {

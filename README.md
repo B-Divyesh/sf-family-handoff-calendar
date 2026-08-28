@@ -47,7 +47,7 @@ ICS imports recognize `CATEGORIES:PICKUP`, `DROPOFF`, and `HANDOFF`, plus the po
 
 JSON restore replaces local data only after a confirmation. ICS import merges by UID. Exported files can contain sensitive schedule/location details and are never uploaded by the app.
 
-The optional license flow uses the Sociobot billing API only. Set `VITE_BILLING_BASE` at build time to select another registered environment; the default is the factory pilot endpoint. Product IDs and payment-provider credentials are not stored here.
+The optional license flow uses the Sociobot billing API only. Set `VITE_BILLING_BASE` at build time to select another registered environment; the default is `https://api.sociobot.in`. Product IDs and payment-provider credentials are not stored here.
 
 ## Project notes
 
