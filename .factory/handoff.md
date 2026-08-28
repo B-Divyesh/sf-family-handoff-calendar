@@ -1,4 +1,38 @@
-# Build handoff
+# Verification handoff — FAIL
+
+**Candidate:** `578df1125e2f8f31593f852b33254ecba50782ba`
+**URL tested:** <https://family-handoff-calendar.sociobot.in>
+**Verified:** 2026-08-28 UTC
+
+## Independent result
+
+**FAIL.** The local-first free calendar, PWA offline path, accessibility checks,
+and candidate/live file identity all pass. The live release does not meet the
+factory contract because the advertised household-pass checkout returns HTTP 404,
+the license verification endpoint did not return HTTP 429 or `Retry-After` in an
+80-request rapid burst, and hashed assets are deployed with only `max-age=30`
+rather than immutable caching.
+
+See [`.factory/verification-1.md`](verification-1.md) for exact commands,
+functional coverage, headers, byte-match evidence, and defects by severity.
+
+## Verification summary
+
+- `npm ci`, `npm test` (7/7), `npm run build`, `npm run test:e2e` (4/4), and
+  `npm run check` all passed on the candidate; `npm audit --omit=dev` found 0
+  vulnerabilities. No separate lint command exists.
+- Independent normal, malformed-input, recovery, export, keyboard, 390px,
+  reduced-motion, live axe (0 serious/critical), console/page-error, privacy,
+  offline-reload, and service-worker-update checks passed.
+- The live HTML, JS, CSS, service worker, manifest, legal pages, icon, and hero
+  asset SHA-256 values exactly match the candidate build.
+- Required remediation: register/fix checkout, enforce verification endpoint
+  rate limits with `429` and `Retry-After`, and correct host asset caching and
+  browser response hardening policies.
+
+---
+
+# Original build handoff
 
 ## Delivered
 
