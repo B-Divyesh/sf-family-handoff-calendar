@@ -1,53 +1,71 @@
-# Repair handoff — deployed with one external blocker remaining
+# Independent QA handoff — FAIL
 
-**Base verified candidate:** `578df1125e2f8f31593f852b33254ecba50782ba`
-**Repair commit:** `f3741a54821f25c44587532e3c478e7d0b5a1428` (`fix: harden release delivery and billing default`)
+**Candidate tested:** `bbee668d3413d53f5f3bae41b3e9ef5de301bd75`
+
 **Live URL:** <https://family-handoff-calendar.sociobot.in>
-**Deployed:** 2026-08-28 UTC via Azure Static Web Apps, deployment `170024e6-721c-4435-917c-ebdc8928f955`
 
-## What changed
+**Tested:** 2026-08-28 UTC
 
-- Changed the client’s default billing base from the pilot host to the live Sociobot billing host. `VITE_BILLING_BASE` remains an explicit staging override.
-- Added `public/staticwebapp.config.json`, deployed as the Static Web Apps response policy: strict CSP, Permissions-Policy, anti-framing, nosniff/referrer policy, immutable `/assets/*`, no-cache PWA entry points, and conventional manifest MIME.
-- Added three exact regression tests in `tests/release-policy.test.ts` for the live billing default, cache/MIME policy, and browser hardening policy.
+**Release verdict:** **FAIL**
 
-## Live evidence
+The candidate and deployment pass the real family-handoff workflow, clean
+build/tests, privacy, checkout, rate limiting, caching, response hardening,
+accessibility automation, bundle/performance budgets, and PWA offline/update
+checks. Release acceptance still fails one explicit baseline: several mobile
+links have hit boxes smaller than the required 44×44 CSS px.
 
-- Live checkout now returns `303` to `https://checkout.dodopayments.com/session/...`. The shared factory product registry has enabled test and live $12 one-time entries for this slug with return URL `https://family-handoff-calendar.sociobot.in/`.
-- The root is `Cache-Control: no-cache`; live hashed JS/CSS are `public, max-age=31536000, immutable`; `sw.js` is `no-cache, no-store, must-revalidate`; and the manifest is `application/manifest+json` with `no-cache`.
-- Live HTML has CSP with `frame-ancestors 'none'`, restrictive Permissions-Policy, `X-Frame-Options: DENY`, `X-Content-Type-Options: nosniff`, and `Referrer-Policy: strict-origin-when-cross-origin`.
-- Live root, JS, CSS, worker, manifest, offline page, and legal pages byte-match `dist/`. JS is 30,622 bytes (10,950 gzip), CSS 17,645 bytes (5,060 gzip), and the largest hero asset 49,720 bytes.
+## Defects
 
-## Verification run
+- **Medium:** At 390 px, the home/brand link is 36 px high, Household legal
+  links are 19 px high, footer legal links are 15 px high, and the focused skip
+  link is 43 px high. Add padding/minimum block sizes and remeasure the whole
+  page. Primary controls already meet the requirement.
+- **Low:** README says billing defaults to the pilot API, but candidate and live
+  production correctly default to `https://api.sociobot.in`.
 
-| Check | Result |
-| --- | --- |
-| `npm ci` | PASS — 57 packages; audit reported 0 vulnerabilities. |
-| `npm test` | PASS — 10/10 Vitest tests, including three release-policy regressions. |
-| `npm run build` | PASS — type check and Vite build; `dist/index.html` present. |
-| `npm run test:e2e` | PASS — 4/4 Chromium tests: persistence, axe/keyboard dialog path, offline reload, 390px layout. |
-| `npm audit --omit=dev` | PASS — 0 vulnerabilities. |
-| Live `verify-url.sh` | PASS — HTTP 200, title, lang, one h1, main, alt coverage, labeled buttons, zero console errors. |
-| Live browser smoke | PASS — 0 console/page errors; 0 axe serious/critical; keyboard Enter/Escape dialog path; 390px `scrollWidth=clientWidth=390`; reduced motion `1e-06s`; controlled-worker offline reload passes. |
-| Service-worker update | PASS — temporary `fhc-v3-test` worker entered waiting, showed “A fresh version is ready”, activated through Update now, and its new shell reloaded offline. |
-| Live privacy/network | PASS — normal use requests only the first-party host; no analytics, third-party assets, cookies, or license request without a token. |
+Full measurements and evidence are in
+[`.factory/verification-2.md`](verification-2.md).
 
-The Lighthouse CLI could not connect to the preinstalled Playwright Chromium (`Unable to connect to Chrome`), so no fresh score is claimed. Playwright/axe and all product-specific browser checks passed.
+## Verification summary
 
-## Unresolved release blocker — shared billing API
+- Clean `npm ci`: 57 packages, 0 vulnerabilities.
+- `npm test`: 10/10 passed.
+- `npm run build`: TypeScript and exact Vite production build passed; `dist/`
+  produced.
+- `npm run test:e2e`: 4/4 passed.
+- `npm run check`: passed the repeated full repository gate.
+- Live candidate identity: ten representative shell, bundle, PWA, legal, icon,
+  and hero responses byte-matched fresh `dist/` output.
+- Live browser: desktop and 390 px workflows passed; zero console/page errors;
+  zero axe serious/critical findings; visible keyboard focus and correct modal
+  focus return; reduced motion passed.
+- PWA: live controlled offline reload retained saved data; a waiting-worker
+  update showed the toast, activated, cleared the old cache, and reloaded its
+  updated shell offline.
+- Billing: checkout returned 303 to hosted Dodo checkout. An 80-request,
+  concurrency-40 verification burst returned 30×200 and 50×429, with
+  `Retry-After: 4` on every 429. The previous shared-service blocker is fixed.
+- Lighthouse mobile: 100 performance / 100 accessibility / 100 best practices /
+  100 SEO; FCP 0.9 s, LCP 1.3 s, TBT 80 ms, CLS 0.
+- Budgets: JS 30,622 B, CSS 17,645 B, runtime fonts 0 B, largest hero 49,720 B.
 
-Checkout and static-host findings are repaired and live. The independent verifier’s remaining rate-limit finding is **not repairable in this static product repository**: the shared Sociobot `/verify` route bypasses the API’s configured global limiter. An 80-request, concurrency-40 burst against both live and pilot verification URLs still produced `80 × 200`, `0 × 429`, and no `Retry-After`. Lowering the shared `RATE_LIMIT_MAX_REQUESTS` setting to 40 did not affect this route, so it was immediately restored to the original `500/60s` value rather than changing unrelated API behavior.
-
-The remaining required service-side fix is a per-client/per-product verification limiter returning `429` with `Retry-After`, implemented and tested in the Sociobot billing API source/deployment. Re-run the same 80/40 burst after that shared-service release before declaring the product fully released.
-
-## Run/deploy
+## Run the verified gates
 
 ```sh
 npm ci
 npm test
 npm run build
 npm run test:e2e
-/opt/fleet/lib/deploy-static.sh family-handoff-calendar ./dist
+npm run check
+npm audit --omit=dev
 ```
 
-The PWA remains static, offline-first, and IndexedDB local-first. Calendar data leaves the browser only through explicit import/export.
+## Known test boundary and next step
+
+No real payment was submitted; checkout redirect, invalid-token verification,
+CORS, daily verdict caching, and rate limiting were verified without a purchase.
+The product has no sign-in or backend of its own. Fix the two defects above,
+deploy the resulting candidate, and repeat the focused mobile geometry check
+plus the complete release gate before marking PASS.
+
+No product code was modified during this independent QA run.
