@@ -1,71 +1,100 @@
-# Independent QA handoff — FAIL
+# Repair handoff — PASS
 
-**Candidate tested:** `bbee668d3413d53f5f3bae41b3e9ef5de301bd75`
+**Work order:** `family-handoff-calendar-repair-2`
+
+**Verifier report:** `da775fa08cc62802e163085206a1581206198707`
+
+**Repaired candidate:** `ced677d1cbe80c9135f99457504b7345d4db24e0`
 
 **Live URL:** <https://family-handoff-calendar.sociobot.in>
 
-**Tested:** 2026-08-28 UTC
+**Deployment:** Azure Static Web Apps `f9a959c2-277f-42ca-9fb7-5e785d9f903b`, 2026-08-28 UTC
 
-**Release verdict:** **FAIL**
+## What changed
 
-The candidate and deployment pass the real family-handoff workflow, clean
-build/tests, privacy, checkout, rate limiting, caching, response hardening,
-accessibility automation, bundle/performance budgets, and PWA offline/update
-checks. Release acceptance still fails one explicit baseline: several mobile
-links have hit boxes smaller than the required 44×44 CSS px.
+- Added explicit 44 px minimum hit areas to the header brand, focused skip link, Household legal links, and footer legal links. Existing gaps and the night-market visual system are unchanged.
+- Added a 390 px Playwright regression that measures the rendered bounding box of every link named by the verifier and fails below 44×44 CSS px. It also checks that the repair introduces no horizontal overflow.
+- Corrected README billing guidance: production defaults to `https://api.sociobot.in`; `VITE_BILLING_BASE` remains the explicit staging override.
+- Added a documentation-policy regression that checks both billing statements against the source default.
+- Advanced the PWA cache from `fhc-v2` to `fhc-v3` so installed copies receive the repair and remove the old shell cache.
 
-## Defects
+No calendar, import/export, ownership, license, privacy, or paid-tier behavior was changed.
 
-- **Medium:** At 390 px, the home/brand link is 36 px high, Household legal
-  links are 19 px high, footer legal links are 15 px high, and the focused skip
-  link is 43 px high. Add padding/minimum block sizes and remeasure the whole
-  page. Primary controls already meet the requirement.
-- **Low:** README says billing defaults to the pilot API, but candidate and live
-  production correctly default to `https://api.sociobot.in`.
+## Reproduction and regression evidence
 
-Full measurements and evidence are in
-[`.factory/verification-2.md`](verification-2.md).
+Before the repair, a fresh 390×844 Chromium run reproduced the verifier's measurements:
 
-## Verification summary
+| Target | Before | Live repair |
+| --- | ---: | ---: |
+| Header brand/home | 224.55×36 px | 224.55×44 px |
+| Focused skip link | 228.03×43 px | 228.03×44 px |
+| Household Privacy | 57.94×19 px | 57.94×44 px |
+| Household Terms | 47.13×19 px | 47.13×44 px |
+| Footer Privacy | 47.47×15 px | 47.47×44 px |
+| Footer Terms | 38.61×15 px | 44×44 px |
 
-- Clean `npm ci`: 57 packages, 0 vulnerabilities.
-- `npm test`: 10/10 passed.
-- `npm run build`: TypeScript and exact Vite production build passed; `dist/`
-  produced.
-- `npm run test:e2e`: 4/4 passed.
-- `npm run check`: passed the repeated full repository gate.
-- Live candidate identity: ten representative shell, bundle, PWA, legal, icon,
-  and hero responses byte-matched fresh `dist/` output.
-- Live browser: desktop and 390 px workflows passed; zero console/page errors;
-  zero axe serious/critical findings; visible keyboard focus and correct modal
-  focus return; reduced motion passed.
-- PWA: live controlled offline reload retained saved data; a waiting-worker
-  update showed the toast, activated, cleared the old cache, and reloaded its
-  updated shell offline.
-- Billing: checkout returned 303 to hosted Dodo checkout. An 80-request,
-  concurrency-40 verification burst returned 30×200 and 50×429, with
-  `Retry-After: 4` on every 429. The previous shared-service blocker is fixed.
-- Lighthouse mobile: 100 performance / 100 accessibility / 100 best practices /
-  100 SEO; FCP 0.9 s, LCP 1.3 s, TBT 80 ms, CLS 0.
-- Budgets: JS 30,622 B, CSS 17,645 B, runtime fonts 0 B, largest hero 49,720 B.
+`tests/e2e/app.spec.ts` now measures those actual rendered boxes. `tests/release-policy.test.ts` now fails if README again names the wrong production default.
 
-## Run the verified gates
+## Clean repository gates
+
+| Check | Result |
+| --- | --- |
+| `npm ci` | PASS — 57 packages installed; 0 vulnerabilities. |
+| `npm test` | PASS — 11/11 Vitest unit and release-policy tests. |
+| `npm run build` | PASS — TypeScript `tsc --noEmit` and Vite 7.3.6; `dist/index.html` produced. |
+| `npm run test:e2e` | PASS — 5/5 Playwright 1.58.2 Chromium tests. |
+| `npm run check` | PASS — the complete unit, type/build, and browser gate from a fresh server. |
+| `npm audit --omit=dev` | PASS — 0 vulnerabilities. |
+| `git diff --check` | PASS. |
+
+There is no separate lint script in this repository; the production TypeScript check is part of `npm run build`.
+
+## Browser, accessibility, privacy, and PWA
+
+- Desktop 1440 px and mobile 390×844 were visually reviewed. Mobile remained `scrollWidth=clientWidth=390`; 200% root text also remained 390 px wide.
+- Playwright axe-core 4.10.2 found 0 serious/critical issues on the first screen, Household view, mobile view, and open event dialog. The factory `verify-url.sh` passed title, `lang=en`, one h1, main landmark, alt text, labels, and zero console/page errors.
+- Keyboard smoke passed: the skip link has visible focus, Enter opens the event dialog onto its title input, Escape closes it, and focus returns to “+ Add handoff”. Reduced motion reports `1e-06s` transitions and animations.
+- A fresh normal-use flow requested only `https://family-handoff-calendar.sociobot.in`. Calendar data appeared only in IndexedDB `family-handoff-calendar`; localStorage and cookies remained empty without a license.
+- A saved “Live offline pickup” survived a controlled-worker offline reload with the offline notice visible.
+- An in-memory update test changed only the served worker revision. The worker entered `waiting`, displayed “A fresh version is ready”, activated through “Update now”, removed the old cache, and reloaded the `fhc-v3-repair-shell` offline.
+- Live Lighthouse 12.8.2 mobile scores: **100 performance / 100 accessibility / 100 best practices / 100 SEO**. FCP 0.9 s, LCP 1.4 s, Speed Index 0.9 s, TBT 0 ms, CLS 0.
+
+## Budgets and live delivery identity
+
+| Budget | Built result |
+| --- | ---: |
+| Initial JS | 30,622 B / 10,950 B gzip |
+| CSS | 17,839 B / 5,090 B gzip |
+| Runtime fonts | 0 B |
+| Largest hero image | 49,720 B |
+
+Ten live responses byte-matched the fresh `dist/` build: root, hashed JS, hashed CSS, worker, manifest, offline page, Privacy, Terms, 192 px icon, and full hero. Representative SHA-256 values:
+
+- `/`: `bcbeff0f1d92a430a0517ea5dfa00652d31f8cb43eb42e6a5c5be7935c4a8ae0`
+- `/assets/index-DZ1-tFXs.js`: `982c51e7ea5b9e60a4949a78c984808aff26f22e604b8b54f6a536945b6ccfcf`
+- `/assets/index-Mrs4zp7u.css`: `dc44cb0fbd50a2a2f89179a0ca1c75cdc10cf9847180d428ad2a9a512278bfa4`
+- `/sw.js`: `5fbfdf5725022fffc291fd7f5730c929062e96c0b8187719794baf80855bd893`
+
+Live response policy also matches the repository: root `no-cache`; hashed assets one-year immutable; worker `no-cache, no-store, must-revalidate`; manifest `no-cache` with `application/manifest+json`; restrictive CSP and Permissions-Policy; DENY framing, nosniff, strict referrer policy, and HSTS.
+
+## Billing and license evidence
+
+- Checkout returned HTTP 303 to a hosted `checkout.dodopayments.com/session/...` URL. No purchase was made.
+- An 80-request verification burst at concurrency 40 completed in 585 ms with **30× HTTP 200 and 50× HTTP 429**. Every 429 returned `Retry-After: 4`.
+- Invalid verification returned HTTP 200 with `{"expires_at":null,"reason":"invalid","valid":false}`, `Cache-Control: no-store`, and CORS allowing the live origin.
+- A returned URL token was stored under `sb_license:family-handoff-calendar`, stripped from the URL, and verified once. A fresh cached verdict made zero calls on reload; a two-day-old verdict made one call.
+
+## Run and deploy
 
 ```sh
 npm ci
-npm test
-npm run build
-npm run test:e2e
 npm run check
 npm audit --omit=dev
+/opt/fleet/lib/deploy-static.sh family-handoff-calendar ./dist
+VERIFY_NODE_MODULES="$PWD/node_modules" /opt/fleet/lib/verify-url.sh \
+  https://family-handoff-calendar.sociobot.in /tmp/fhc-live-evidence
 ```
 
-## Known test boundary and next step
+## Known boundary
 
-No real payment was submitted; checkout redirect, invalid-token verification,
-CORS, daily verdict caching, and rate limiting were verified without a purchase.
-The product has no sign-in or backend of its own. Fix the two defects above,
-deploy the resulting candidate, and repeat the focused mobile geometry check
-plus the complete release gate before marking PASS.
-
-No product code was modified during this independent QA run.
+No real payment was submitted. Hosted checkout redirect, invalid-token verification, CORS, verdict caching, and rate limiting were verified without a purchase. There are no remaining repository or deployment blockers found in this repair run.
